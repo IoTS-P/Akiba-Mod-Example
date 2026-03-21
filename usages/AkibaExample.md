@@ -206,7 +206,7 @@ For the two module main classes defined above, if a batch task needs to run two 
 
 ### 4.1 Akiba Database Overview
 
-Akiba implements data storage based on PostgreSQL. In implementation, Akiba uses a database daemon to start an HTTP service, which provides several interfaces for data operations, including data read/write, PostgreSQL instance creation, data backup, etc. Documentation for all interfaces can be found in [Akiba DB Daemon Usage Guide](https://github.com/IoTS-P/Akiba-DB-Daemon/blob/master/Usage_guide_zh.md).
+Akiba implements data storage based on PostgreSQL. In implementation, Akiba uses a database daemon to start an HTTP service, which provides several interfaces for data operations, including data read/write, PostgreSQL instance creation, data backup, etc. Documentation for all interfaces can be found in [Akiba DB Daemon Usage Guide](https://github.com/IoTS-P/Akiba-DB-Daemon/blob/master/Usage_guide.md).
 
 At the module runtime level, users only need to specify the Akiba username, password, and instance name in the main configuration file. During Akiba runtime, modules can interact with the specified database instance. **Currently, the authentication function of the Akiba database daemon is not fully implemented. In the given Docker service, please uniformly use the username akiba and password akiba to complete all functions. The authentication function will be developed as soon as possible.**
 
@@ -216,7 +216,7 @@ Currently, Akiba provides three subcommands for operating database instances:
 - `instance-backup`: Database instance backup
 - `instance-restore`: Database instance recovery
 
-Specific parameters can be found in [Akiba Framework README](https://github.com/IoTS-P/Akiba-Framework/blob/master/README_zh.md).
+Specific parameters can be found in [Akiba Framework README](https://github.com/IoTS-P/Akiba-Framework/blob/master/README.md).
 
 ### 4.2 Akiba Database Instance Structure
 
@@ -228,7 +228,7 @@ Database initialization creates 4 data tables, 1 view, and 1 index:
 - `db_backup_tree`: Database backup tree (not yet implemented)
 - `using_binaries`: View of actually used binary file information (i.e., if a file exists in `processed_binaries`, use the processed file; otherwise, use the original file)
 
-Specific definitions can be found in [Akiba DB Daemon Usage Guide](https://github.com/IoTS-P/Akiba-DB-Daemon/blob/master/Usage_guide_zh.md).
+Specific definitions can be found in [Akiba DB Daemon Usage Guide](https://github.com/IoTS-P/Akiba-DB-Daemon/blob/master/Usage_guide.md).
 
 ### 4.3 Akiba Module Data Table Structure
 
