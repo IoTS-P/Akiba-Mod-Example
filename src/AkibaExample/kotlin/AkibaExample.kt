@@ -2,13 +2,18 @@ package org.iotsplab.akiba.module
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import ghidra.app.plugin.core.analysis.AutoAnalysisManager
+import ghidra.program.model.listing.Function
 import ghidra.program.model.listing.Program
 import ghidra.program.util.GhidraProgramUtilities
 import org.apache.logging.log4j.Level
+import org.iotsplab.akiba.utils.FailOnCancelled
+import org.iotsplab.akiba.utils.IgnoreRuntimeTimeout
+import org.iotsplab.akiba.utils.TaskInterface
 import org.iotsplab.akiba.utils.WithTableColumn
 import org.iotsplab.akiba.utils.string.allStrings
 
 @WithTableColumn("strings", "JSONB")
+@FailOnCancelled
 class AkibaExample(
     id: Int,
     program: Program,
@@ -38,5 +43,12 @@ class AkibaExample(
         logger.info("Found strings: $result")
         updateData(mapOf(
             "strings" to jacksonObjectMapper().writeValueAsString(result)))
+    }
+
+    @TaskInterface
+    fun findMainFunction(): Function? {
+        return program!!.listing.getFunctions(true).firstOrNull {
+            it.name == "main"
+        }
     }
 }
