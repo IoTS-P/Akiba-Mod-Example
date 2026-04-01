@@ -67,12 +67,19 @@ data class ModuleMetadata(
 // Append your module here
 val localModules = listOf(
     ModuleMetadata(
-        moduleName = "AkibaExample",
-        mainClassPath = "org.iotsplab.akiba.module.AkibaExample",
+        moduleName = "AkibaExample1",
+        mainClassPath = "org.iotsplab.akiba.module.AkibaExample1",
         authors = listOf("Hornos3"),
         version = "1.0",
         briefDescription = "Akiba Example Module, find all strings in the binary file"
-    )
+    ),
+    ModuleMetadata(
+        moduleName = "AkibaExample2",
+        mainClassPath = "org.iotsplab.akiba.module.AkibaExample2",
+        authors = listOf("Hornos3"),
+        version = "1.0",
+        briefDescription = "Akiba Example Module, find the address of function 'main()'"
+    ),
 )
 
 val lc: Map<String, Configuration> = localModules.associate {
@@ -89,6 +96,8 @@ val underDevelopmentModules: List<String> = listOf()
 dependencies {
     PublicConfiguration(project(":akiba_framework"))
     PublicConfiguration(fileTree(mapOf("dir" to "modules", "include" to listOf("*.jar"))))
+
+    (lc["AkibaExample2"]!!)(moduleDependency(listOf("AkibaExample1")))
 }
 
 // If there are any finalize tasks in some modules, add them here

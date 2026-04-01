@@ -5,6 +5,7 @@ import ghidra.app.plugin.core.analysis.AutoAnalysisManager
 import ghidra.program.model.listing.Function
 import ghidra.program.model.listing.Program
 import ghidra.program.util.GhidraProgramUtilities
+import ghidra.util.task.TaskMonitor
 import org.apache.logging.log4j.Level
 import org.iotsplab.akiba.utils.FailOnCancelled
 import org.iotsplab.akiba.utils.IgnoreRuntimeTimeout
@@ -14,12 +15,12 @@ import org.iotsplab.akiba.utils.string.allStrings
 
 @WithTableColumn("strings", "JSONB")
 @FailOnCancelled
-class AkibaExample(
+class AkibaExample1(
     id: Int,
     program: Program,
     consoleLogLevel: Level = Level.INFO,
     fileLogLevel: Level = Level.INFO,
-    tableName: String? = "example_table"
+    tableName: String? = "example_table_1"
 ): AkibaModule(
     id = id,
     program = program,
@@ -34,7 +35,7 @@ class AkibaExample(
         aam.initializeOptions(program!!.getOptions("Analyzers"))
 
         aam.reAnalyzeAll(null)
-        aam.startAnalysis(taskGlobalMonitor)    // When the time is out, the task will be cancelled automatically
+        aam.startAnalysis(TaskMonitor.DUMMY)    // When the time is out, the task will be cancelled automatically
         aam.cancelQueuedTasks()
         GhidraProgramUtilities.markProgramAnalyzed(program)     // mark this program as auto-analyzed
 
