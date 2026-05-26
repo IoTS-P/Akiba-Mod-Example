@@ -80,6 +80,22 @@ val localModules = listOf(
         version = "1.0",
         briefDescription = "Akiba Example Module, find the address of function 'main()'"
     ),
+    ModuleMetadata(
+        moduleName = "AkibaExample3",
+        mainClassPath = "org.iotsplab.akiba.module.AkibaExample3",
+        authors = listOf("Hornos3"),
+        version = "1.0",
+        briefDescription = "Akiba Example Module, demonstrates dynamic callModule() with " +
+                "in-memory / JSON / disk config injection"
+    ),
+    ModuleMetadata(
+        moduleName = "AkibaExample4",
+        mainClassPath = "org.iotsplab.akiba.module.AkibaExample4",
+        authors = listOf("Hornos3"),
+        version = "1.0",
+        briefDescription = "Akiba Example Module, demonstrates runtime importFile() " +
+                "chained with callModule() on the newly-imported binary"
+    ),
 )
 
 val lc: Map<String, Configuration> = localModules.associate {
@@ -98,6 +114,12 @@ dependencies {
     PublicConfiguration(fileTree(mapOf("dir" to "modules", "include" to listOf("*.jar"))))
 
     (lc["AkibaExample2"]!!)(moduleDependency(listOf("AkibaExample1")))
+    // AkibaExample3 dynamically calls AkibaExample1 at runtime via callModule(); we still
+    // declare a build-time dependency so AkibaExample1's classes (AkibaExample1::findMainFunction
+    // is referenced reflectively via callTaskAPI) are visible on the compile classpath.
+    (lc["AkibaExample3"]!!)(moduleDependency(listOf("AkibaExample1")))
+    // AkibaExample4 dynamically calls AkibaExample3 at runtime; same rationale.
+    (lc["AkibaExample4"]!!)(moduleDependency(listOf("AkibaExample3")))
 }
 
 // If there are any finalize tasks in some modules, add them here
