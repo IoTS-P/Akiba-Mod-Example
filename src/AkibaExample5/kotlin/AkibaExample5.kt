@@ -39,7 +39,11 @@ import org.iotsplab.akiba.utils.DoNotCreateTable
     "overflows, use-after-free, race conditions, insecure API usage " +
     "(e.g. gets, strcpy, sprintf without bounds), and control-flow hijacks. " +
     "When you find a potential vulnerability, explain where it is (function " +
-    "name, address), what type it is, and its potential impact."
+    "name, address), what type it is, and its potential impact.\n\n" +
+    "The normal steps are:\n" +
+    "1. Search available Ghidra APIs using `query_ghidra_api`.\n" +
+    "2. Use Kotlin to write+execute a script (using `run_script`) to get functions, disassembly results, etc.\n" +
+    "3. If you get enough information, you can reach to a conclusion and write a report of vulnerabilities you've found\n"
 )
 @WithAgentMaxIterations(20)
 @DoNotCreateTable
