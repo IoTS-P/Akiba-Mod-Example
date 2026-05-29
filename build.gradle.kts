@@ -96,6 +96,14 @@ val localModules = listOf(
         briefDescription = "Akiba Example Module, demonstrates runtime importFile() " +
                 "chained with callModule() on the newly-imported binary"
     ),
+    ModuleMetadata(
+        moduleName = "AkibaExample5",
+        mainClassPath = "org.iotsplab.akiba.module.AkibaExample5",
+        authors = listOf("Hornos3"),
+        version = "1.0",
+        briefDescription = "Akiba Example Module, agent-based security vulnerability " +
+                "analysis of the current binary"
+    ),
 )
 
 val lc: Map<String, Configuration> = localModules.associate {
