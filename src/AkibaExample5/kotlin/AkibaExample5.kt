@@ -33,17 +33,16 @@ import org.iotsplab.akiba.utils.DoNotCreateTable
  * focused on a single pass.
  */
 @WithAgentSystemPrompt(
-    "You are an expert binary security analyst. You analyze binaries for " +
-    "security vulnerabilities using Ghidra reverse engineering tools. " +
-    "Focus on: buffer overflows, format string vulnerabilities, integer " +
-    "overflows, use-after-free, race conditions, insecure API usage " +
-    "(e.g. gets, strcpy, sprintf without bounds), and control-flow hijacks. " +
-    "When you find a potential vulnerability, explain where it is (function " +
-    "name, address), what type it is, and its potential impact.\n\n" +
-    "The normal steps are:\n" +
-    "1. Search available Ghidra APIs using `query_ghidra_api`.\n" +
-    "2. Use Kotlin to write+execute a script (using `run_script`) to get functions, disassembly results, etc.\n" +
-    "3. If you get enough information, you can reach to a conclusion and write a report of vulnerabilities you've found\n"
+    // The base role/capabilities are already defined in DEFAULT_SYSTEM_PROMPT.
+    // Here we only add the security-analysis specialization on top.
+    "Specialization for this session: security vulnerability analysis. Focus your" +
+    " findings on memory-safety bugs (buffer overflows, OOB read/write, UAF, double" +
+    " free), arithmetic issues (integer overflow/underflow, signed/unsigned mix-ups," +
+    " truncation), insecure-API usage (gets, strcpy, strcat, sprintf, scanf without" +
+    " bounds, system/popen with tainted input, etc.), format-string vulnerabilities," +
+    " and control-flow hijack primitives. For every reported issue, give the function" +
+    " name, address, vulnerability class, the concrete code evidence, and a brief" +
+    " impact/severity assessment."
 )
 @WithAgentMaxIterations(20)
 @DoNotCreateTable
@@ -68,29 +67,66 @@ class AkibaExample5(
     override fun agentLLMConfig() = null
 
     /**
-     * Task prompt sent to the agent. It provides context about what
-     * binary is loaded and what the agent should do.
+     * Task prompt sent to the agent. Provides:
+     *  - the concrete request and binary metadata,
+     *  - an example workflow showing one reasonable path through the analysis
+     *    (NOT a strict script — adapt it to what the binary actually exposes),
+     *  - the expected final-report format.
+     *
+     * Tool selection itself is governed by the global tools_usage_policy in
+     * the framework's default agent rules, not repeated here.
      */
     override fun taskPrompt(): String = buildString {
         appendLine("Analyze the current binary for security vulnerabilities.")
         appendLine()
-        if (currentProgram != null) {
+        if (program != null) {
             appendLine("Binary info:")
-            appendLine("  Name: ${currentProgram!!.name}")
-            appendLine("  Format: ${currentProgram!!.executableFormat}")
-            appendLine("  Language: ${currentProgram!!.languageID}")
-            appendLine("  Compiler: ${currentProgram!!.compiler}")
+            appendLine("  Name:     ${program!!.name}")
+            appendLine("  Format:   ${program!!.executableFormat}")
+            appendLine("  Language: ${program!!.languageID}")
+            appendLine("  Compiler: ${program!!.compiler}")
             appendLine()
         }
-        appendLine("Steps:")
-        appendLine("1. List the functions in this binary (use run_script to enumerate them).")
-        appendLine("2. Identify functions that use known-insecure APIs (gets, strcpy, sprintf, " +
-                   "system, etc.) or have suspicious patterns.")
-        appendLine("3. For each potential vulnerability found, describe:")
-        appendLine("   - Location (function name, address)")
-        appendLine("   - Vulnerability type")
-        appendLine("   - Potential impact and severity")
-        appendLine("4. Summarize your findings.")
+
+        appendLine("Example workflow (for an ELF-style binary; adapt as needed):")
+        appendLine("  1. Locate the code entry point — typically `main`, otherwise the program's")
+        appendLine("     entry symbol or _start. Disassemble and decompile it to understand the")
+        appendLine("     top-level control flow.")
+        appendLine("  2. Walk the call graph from `main`: for each callee, decide whether it is a")
+        appendLine("     real internal function or a PLT/GOT/thunk import stub, and recurse into")
+        appendLine("     real bodies. Look for dangerous-API call sites and other vulnerable")
+        appendLine("     patterns; record the REAL caller (not the import stub) as the finding.")
+        appendLine("  3. Use string search + xrefs to short-circuit work: when you spot an")
+        appendLine("     interesting string (format specifier, error message, command fragment,")
+        appendLine("     env-var name, path, etc.), find its address with the string-search")
+        appendLine("     script and follow xrefs to discover which functions actually use it —")
+        appendLine("     that often reveals the role of an unnamed function quickly.")
+        appendLine("  4. Verify reachability of every reported issue (real xrefs from reachable")
+        appendLine("     code) and de-duplicate by the real target function/address before")
+        appendLine("     finalizing.")
+        appendLine()
+
+        appendLine("Final-answer format (use this exact structure):")
+        appendLine("  ## Summary")
+        appendLine("  <2–4 sentences: binary purpose if discoverable, total distinct findings,")
+        appendLine("   highest severity present, overall confidence.>")
+        appendLine()
+        appendLine("  ## Findings")
+        appendLine("  For each DISTINCT issue (de-duplicated by real target), one block:")
+        appendLine("  ### F<N>. <short title>")
+        appendLine("  - Location:    <function name> @ <address>  (caller of any stub, not the stub)")
+        appendLine("  - Class:       <e.g. stack buffer overflow / format string / command injection>")
+        appendLine("  - Evidence:    <minimal asm or pseudocode excerpt + which arg is unsafe>")
+        appendLine("  - Reachability: <how it is reached from program entry / which xrefs>")
+        appendLine("  - Impact:      <what an attacker could achieve>")
+        appendLine("  - Severity:    <Critical | High | Medium | Low>  (justify in one phrase)")
+        appendLine()
+        appendLine("  ## Notes")
+        appendLine("  <Optional. Things you checked and ruled out, limitations of the analysis,")
+        appendLine("   or follow-ups that need user decision/input.>")
+        appendLine()
+        appendLine("If no real, reachable vulnerability is found, output ## Summary with that")
+        appendLine("conclusion and an empty ## Findings section — do NOT pad with speculation.")
     }
 
     /**
