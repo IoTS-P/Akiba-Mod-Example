@@ -3,7 +3,7 @@ package org.iotsplab.akiba.module
 import ghidra.program.model.listing.Program
 import org.apache.logging.log4j.Level
 import org.iotsplab.akiba.llm.agent.AgentModule
-import org.iotsplab.akiba.llm.agent.Tool
+import org.iotsplab.akiba.llm.tool.Tool
 import org.iotsplab.akiba.llm.agent.WithAgentMaxIterations
 import org.iotsplab.akiba.llm.agent.WithAgentSystemPrompt
 import org.iotsplab.akiba.llm.tool.BuiltInTools
@@ -42,7 +42,20 @@ import org.iotsplab.akiba.utils.DoNotCreateTable
     " bounds, system/popen with tainted input, etc.), format-string vulnerabilities," +
     " and control-flow hijack primitives. For every reported issue, give the function" +
     " name, address, vulnerability class, the concrete code evidence, and a brief" +
-    " impact/severity assessment."
+    " impact/severity assessment." +
+    " IMPORTANT — disassembly vs. decompilation: when reasoning about real" +
+    " program behavior, prefer the disassembly listing over the decompiler" +
+    " output. The decompiler can drop, fold or misrepresent instructions" +
+    " (especially around inline assembly, calling-convention edge cases," +
+    " optimizer artifacts, jump tables, and partial functions), so its" +
+    " pseudocode is NOT fully trustworthy and may mislead the analysis." +
+    " Use `disassemble_function` as the primary source of truth and only" +
+    " consult `decompile_function` as a hint to focus your reading. If the" +
+    " two disagree, trust the disassembly. For functions that are too" +
+    " large to disassemble in a single call, use the `addressAfter`" +
+    " parameter of `disassemble_function` to page through the body" +
+    " starting from a known address rather than relying on a possibly" +
+    " truncated dump."
 )
 @WithAgentMaxIterations(20)
 @DoNotCreateTable
@@ -135,7 +148,7 @@ class AkibaExample5(
      * avoid unnecessary token consumption in a single-pass vuln scan.
      */
     override fun defineTools(): List<Tool> =
-        BuiltInTools.all(this).filter { it.name != "run_sub_agent" }
+        BuiltInTools.all(this, agentDbClient).filter { it.name != "run_sub_agent" }
 
     /**
      * Keep built-in tools off (defineTools already provides the filtered set).

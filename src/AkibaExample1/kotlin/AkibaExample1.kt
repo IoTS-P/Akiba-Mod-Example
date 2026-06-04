@@ -8,6 +8,7 @@ import ghidra.program.util.GhidraProgramUtilities
 import ghidra.util.task.TaskMonitor
 import org.apache.logging.log4j.Level
 import org.iotsplab.akiba.data.database.AgentDatabaseClient
+import org.iotsplab.akiba.llm.agent.AgentModule
 import org.iotsplab.akiba.llm.tool.ScriptLibraryTool
 import org.iotsplab.akiba.utils.FailOnCancelled
 import org.iotsplab.akiba.utils.IgnoreRuntimeTimeout
@@ -23,13 +24,15 @@ class AkibaExample1(
     consoleLogLevel: Level = Level.INFO,
     fileLogLevel: Level = Level.INFO,
     tableName: String? = "example_table_1"
-): AkibaModule(
+): AgentModule(
     id = id,
     program = program,
     consoleLogLevel = consoleLogLevel,
     fileLogLevel = fileLogLevel,
     tableName = tableName
 ) {
+    override fun taskPrompt() = ""
+
     override suspend fun startProcess() {
         // Auto analysis by Ghidra
         val aam: AutoAnalysisManager = AutoAnalysisManager.getAnalysisManager(program)
@@ -58,7 +61,7 @@ class AkibaExample1(
     private fun testScriptLibrary() {
         logger.info("=== Testing Script Library ===")
 
-        val tool = ScriptLibraryTool(this)
+        val tool = ScriptLibraryTool(this, agentDbClient)
         val mapper = jacksonObjectMapper()
 
         // Pick a stable address from the loaded program for set_comment, so the
