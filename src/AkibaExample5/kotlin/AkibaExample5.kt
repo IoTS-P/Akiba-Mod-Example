@@ -57,7 +57,7 @@ import org.iotsplab.akiba.utils.DoNotCreateTable
     " starting from a known address rather than relying on a possibly" +
     " truncated dump."
 )
-@WithAgentMaxIterations(20)
+@WithAgentMaxIterations(100)
 @DoNotCreateTable
 class AkibaExample5(
     configPath: String? = null,
@@ -121,7 +121,7 @@ class AkibaExample5(
 
         appendLine("Final-answer format (use this exact structure):")
         appendLine("  ## Summary")
-        appendLine("  <2–4 sentences: binary purpose if discoverable, total distinct findings,")
+        appendLine("  <2-4 sentences: binary purpose if discoverable, total distinct findings,")
         appendLine("   highest severity present, overall confidence.>")
         appendLine()
         appendLine("  ## Findings")
