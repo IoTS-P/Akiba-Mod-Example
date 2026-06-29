@@ -126,21 +126,68 @@ class AkibaExample1(
             // rename_function: rename "main" to "renamed_main". The script
             // opens its own transaction.
             "rename_function" to mapOf("target" to "main", "newName" to "renamed_main"),
-            // create_data_type: create a simple structure.
-            "create_data_type" to mapOf(
+            // manage_data_type: create a simple structure.
+            "manage_data_type" to mapOf(
                 "name" to "TestStruct",
                 "components" to """[{"name":"field1","type":"int"},{"name":"field2","type":"char"}]"""
             ),
-            // change_variable_type: requires a function with variables;
-            // use "main" as target. If main has no local/param the script
-            // will fail gracefully.
-            "change_variable_type" to mapOf("target" to "renamed_main", "variable" to "param_1", "type" to "int"),
+            // alter_func_signature: retype param_0 of renamed_main. If the
+            // function has no parameter the script will fail gracefully.
+            "alter_func_signature" to mapOf(
+                "target" to "renamed_main",
+                "action" to "set_param_type",
+                "paramOrdinal" to 0,
+                "paramType" to "int",
+            ),
+            // alter_func_signature: batch mode — retype param_0 and rename
+            // param_1 in a single call. Only runs if the function has both.
+            "alter_func_signature" to mapOf(
+                "target" to "renamed_main",
+                "operations" to """[
+                    {"action":"set_param_type","paramOrdinal":0,"paramType":"char *"},
+                    {"action":"rename_param","paramOrdinal":1,"newParamName":"argc_copy"}
+                ]""",
+            ),
+            // alter_func_var: rename a local variable. If the function has
+            // no matching local, the script will fail gracefully.
+            "alter_func_var" to mapOf(
+                "target" to "renamed_main",
+                "name" to "local_8",
+                "action" to "rename",
+                "newName" to "rc",
+            ),
             // define_undefine_data: define a dword at a readable address.
             "define_undefine_data" to mapOf("address" to readAddress, "type" to "int", "length" to 4),
-            // rename_label: rename the entry point label. The label at
+            // alter_label: rename the entry point label. The label at
             // commentTargetAddress was just used by set_get_comment, so it
             // should exist.
-            "rename_label" to mapOf("target" to commentTargetAddress, "newName" to "test_marker_label")
+            "alter_label" to mapOf(
+                "target" to commentTargetAddress,
+                "action" to "rename",
+                "newName" to "test_marker_label",
+            ),
+            // alter_label: set_data_type on the renamed label.
+            "alter_label" to mapOf(
+                "target" to "test_marker_label",
+                "action" to "set_data_type",
+                "type" to "int",
+                "length" to 4,
+            ),
+            // alter_label: delete the renamed label.
+            "alter_label" to mapOf(
+                "target" to "test_marker_label",
+                "action" to "delete",
+            ),
+            // manage_data_type: query the existing TestStruct.
+            "manage_data_type" to mapOf("name" to "TestStruct", "action" to "get"),
+            // manage_data_type: update TestStruct by renaming a component.
+            "manage_data_type" to mapOf(
+                "name" to "TestStruct",
+                "action" to "update",
+                "componentEdits" to """[{"index":0,"action":"replace","type":"int","name":"renamed_field"}]""",
+            ),
+            // manage_data_type: delete TestStruct.
+            "manage_data_type" to mapOf("name" to "TestStruct", "action" to "delete"),
         )
 
         // ── Multi-type parameter tests ──
@@ -228,8 +275,8 @@ class AkibaExample1(
             // ── define_undefine_data: String + String(enum) + String + Number ──
             "define_undefine_data" to mapOf("address" to readAddress, "action" to "define", "type" to "int", "length" to 4),
 
-            // ── rename_label: String × 2 + optional String ──
-            "rename_label" to mapOf("target" to commentTargetAddress, "newName" to "multi_type_label")
+            // ── alter_label: String × 2 + optional String ──
+            "alter_label" to mapOf("target" to commentTargetAddress, "newName" to "multi_type_label")
         )
 
         var passed = 0

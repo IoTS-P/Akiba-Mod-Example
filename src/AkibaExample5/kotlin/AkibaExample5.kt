@@ -3,9 +3,9 @@ package org.iotsplab.akiba.module
 import ghidra.program.model.listing.Program
 import org.apache.logging.log4j.Level
 import org.iotsplab.akiba.llm.agent.AgentModule
+import org.iotsplab.akiba.llm.agent.AgentPrompts
 import org.iotsplab.akiba.llm.tool.Tool
-import org.iotsplab.akiba.llm.agent.WithAgentMaxIterations
-import org.iotsplab.akiba.llm.agent.WithAgentSystemPrompt
+import org.iotsplab.akiba.utils.WithAgentMaxIterations
 import org.iotsplab.akiba.llm.tool.BuiltInTools
 
 import org.iotsplab.akiba.utils.DoNotCreateTable
@@ -29,34 +29,9 @@ import org.iotsplab.akiba.utils.DoNotCreateTable
  *
  * This is intended as a test of the agent pipeline end-to-end.
  * [maxAgentIterations] is set to 20 to give the agent enough room for
- * multi-step analysis. RunSubAgentTool is disabled to keep the analysis
+ * multi-step analysis. `spawn_sub_agent` is disabled to keep the analysis
  * focused on a single pass.
  */
-@WithAgentSystemPrompt(
-    // The base role/capabilities are already defined in DEFAULT_SYSTEM_PROMPT.
-    // Here we only add the security-analysis specialization on top.
-    "Specialization for this session: security vulnerability analysis. Focus your" +
-    " findings on memory-safety bugs (buffer overflows, OOB read/write, UAF, double" +
-    " free), arithmetic issues (integer overflow/underflow, signed/unsigned mix-ups," +
-    " truncation), insecure-API usage (gets, strcpy, strcat, sprintf, scanf without" +
-    " bounds, system/popen with tainted input, etc.), format-string vulnerabilities," +
-    " and control-flow hijack primitives. For every reported issue, give the function" +
-    " name, address, vulnerability class, the concrete code evidence, and a brief" +
-    " impact/severity assessment." +
-    " IMPORTANT — disassembly vs. decompilation: when reasoning about real" +
-    " program behavior, prefer the disassembly listing over the decompiler" +
-    " output. The decompiler can drop, fold or misrepresent instructions" +
-    " (especially around inline assembly, calling-convention edge cases," +
-    " optimizer artifacts, jump tables, and partial functions), so its" +
-    " pseudocode is NOT fully trustworthy and may mislead the analysis." +
-    " Use `disassemble_function` as the primary source of truth and only" +
-    " consult `decompile_function` as a hint to focus your reading. If the" +
-    " two disagree, trust the disassembly. For functions that are too" +
-    " large to disassemble in a single call, use the `addressAfter`" +
-    " parameter of `disassemble_function` to page through the body" +
-    " starting from a known address rather than relying on a possibly" +
-    " truncated dump."
-)
 @WithAgentMaxIterations(100)
 @DoNotCreateTable
 class AkibaExample5(
@@ -78,6 +53,35 @@ class AkibaExample5(
      * (Returns null → falls through to ConfigManager.llmConf.)
      */
     override fun agentLLMConfig() = null
+
+    /**
+     * Per-agent system prompt: extend [AgentPrompts.DEFAULT_SYSTEM_PROMPT]
+     * with the security-vulnerability-analysis specialization that used
+     * to live on the now-removed `@WithAgentSystemPrompt` annotation.
+     */
+    override val agentSystemPrompt: String = AgentPrompts.DEFAULT_SYSTEM_PROMPT + "\n\n" + """
+        Specialization for this session: security vulnerability analysis. Focus your
+        findings on memory-safety bugs (buffer overflows, OOB read/write, UAF, double
+        free), arithmetic issues (integer overflow/underflow, signed/unsigned mix-ups,
+        truncation), insecure-API usage (gets, strcpy, strcat, sprintf, scanf without
+        bounds, system/popen with tainted input, etc.), format-string vulnerabilities,
+        and control-flow hijack primitives. For every reported issue, give the function
+        name, address, vulnerability class, the concrete code evidence, and a brief
+        impact/severity assessment.
+        IMPORTANT — disassembly vs. decompilation: when reasoning about real
+        program behavior, prefer the disassembly listing over the decompiler
+        output. The decompiler can drop, fold or misrepresent instructions
+        (especially around inline assembly, calling-convention edge cases,
+        optimizer artifacts, jump tables, and partial functions), so its
+        pseudocode is NOT fully trustworthy and may mislead the analysis.
+        Use `disassemble_function` as the primary source of truth and only
+        consult `decompile_function` as a hint to focus your reading. If the
+        two disagree, trust the disassembly. For functions that are too
+        large to disassemble in a single call, use the `addressAfter`
+        parameter of `disassemble_function` to page through the body
+        starting from a known address rather than relying on a possibly
+        truncated dump.
+    """.trimIndent()
 
     /**
      * Task prompt sent to the agent. Provides:
@@ -143,12 +147,12 @@ class AkibaExample5(
     }
 
     /**
-     * Provide all built-in tools except RunSubAgentTool.
+     * Provide all built-in tools except `spawn_sub_agent`.
      * Sub-agent spawning is disabled to keep the analysis focused and
      * avoid unnecessary token consumption in a single-pass vuln scan.
      */
     override fun defineTools(): List<Tool> =
-        BuiltInTools.all(this, agentDbClient).filter { it.name != "run_sub_agent" }
+        BuiltInTools.all(this, agentDbClient).filter { it.name != "spawn_sub_agent" }
 
     /**
      * Keep built-in tools off (defineTools already provides the filtered set).
