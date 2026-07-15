@@ -75,7 +75,7 @@ class AkibaExample1(
                 ?: program!!.minAddress
         ).toString()
 
-        // Pick a readable initialized memory block for read_memory_region. Use
+        // Pick a readable initialized memory block for read_memory. Use
         // the block start so the requested range cannot underflow; cap size so
         // logs stay compact even for large binaries.
         val readBlock = program!!.memory.blocks.firstOrNull {
@@ -83,8 +83,21 @@ class AkibaExample1(
         }
         val readAddress = (readBlock?.start ?: program!!.minAddress).toString()
         val readSize = (readBlock?.size?.coerceAtMost(32L) ?: 1L).toInt()
+        // For disassemble_function range mode: endAddress is exclusive, so it
+        // must be strictly greater than startAddress.
+        val readEndAddress = (readBlock?.start?.add(16L) ?: program!!.minAddress.add(1L)).toString()
+
+        // Resolve "main" to its hex entry point address for disassemble_function,
+        // which only accepts hex addresses (not function names).
+        val mainFuncAddress = (
+            program!!.listing.getFunctions(true)
+                .firstOrNull { it.name.equals("main", ignoreCase = true) }?.entryPoint
+                ?: program!!.listing.getFunctions(true).firstOrNull()?.entryPoint
+                ?: program!!.minAddress
+        ).toString()
 
         val scripts = listOf(
+            // ── Read-only scripts ──────────────────────────────────────────
             "binary_info" to emptyMap(),
             "list_functions" to emptyMap(),
             "find_dangerous_calls" to emptyMap(),
@@ -94,13 +107,13 @@ class AkibaExample1(
             // search_strings: substring search; "/" is extremely common in
             // Linux ELFs (paths, format strings) so this should match.
             "search_strings" to mapOf("query" to "/", "limit" to 50),
-            // disassemble_function: reuse "main" — same target as decompile.
-            "disassemble_function" to mapOf("target" to "main", "showBytes" to true),
+            // disassemble_function: center mode around main's entry point.
+            "disassemble_function" to mapOf("address" to mainFuncAddress, "showBytes" to true),
             // entry_point_context: inspect a compact window around entry points.
             "entry_point_context" to mapOf("before" to 4, "after" to 12, "showBytes" to true),
-            // read_memory_region: validate byte and formatting path on a safe
+            // read_memory: validate byte and formatting path on a safe
             // readable block selected from the current program.
-            "read_memory_region" to mapOf(
+            "read_memory" to mapOf(
                 "address" to readAddress,
                 "size" to readSize,
                 "format" to "bytes"
@@ -110,84 +123,102 @@ class AkibaExample1(
             "elf_plt_got_info" to mapOf("maxRelocations" to 20),
             // list_memory_segments: enumerate Ghidra memory blocks/segments.
             "list_memory_segments" to mapOf("showUninitialized" to true),
-            // set_get_comment: attach an EOL comment at a known address. The script
-            // opens its own transaction, so this validates the write path too.
+
+            // ── manage_func_signature: read current signature of main ──────
+            "manage_func_signature" to mapOf("address" to "main", "action" to "read"),
+
+            // ── manage_func_signature: write mode — rename main and set ────
+            // full signature in one call. forceRename=true ensures the
+            // function is renamed from "main" to "renamed_main".
+            "manage_func_signature" to mapOf(
+                "address" to "main",
+                "signature" to "int renamed_main(int argc, char **argv)",
+                "forceRename" to true
+            ),
+
+            // ── manage_data_type: create a struct using C definition ───────
+            "manage_data_type" to mapOf(
+                "action" to "create",
+                "definition" to "struct TestStruct { int field1; char field2; unsigned int field3; };"
+            ),
+
+            // ── manage_data_type: query the created struct ─────────────────
+            "manage_data_type" to mapOf("action" to "get", "name" to "TestStruct"),
+
+            // ── manage_func_signature: use the new type in a signature ─────
+            "manage_func_signature" to mapOf(
+                "address" to "renamed_main",
+                "signature" to "int renamed_main(int argc, char **argv)"
+            ),
+
+            // ── manage_func_signature: batch mode ──────────────────────────
+            // Apply multiple signature changes atomically.
+            "manage_func_signature" to mapOf(
+                "operations" to """[
+                    {"address":"renamed_main","signature":"int renamed_main(int argc, char **argv)"},
+                    {"address":"renamed_main","signature":"int renamed_main(int argc, char **argv)","forceRename":false}
+                ]"""
+            ),
+
+            // ── write_memory: write 4 bytes and verify ─────────────────────
+            "write_memory" to mapOf(
+                "address" to readAddress,
+                "format" to "bytes",
+                "data" to "deadbeef"
+            ),
+
+            // ── read_memory: verify the write ──────────────────────────────
+            "read_memory" to mapOf(
+                "address" to readAddress,
+                "size" to 4,
+                "format" to "bytes"
+            ),
+
+            // ── write_memory: restore original bytes ───────────────────────
+            // Read back was done above; now write back the ELF magic to undo.
+            "write_memory" to mapOf(
+                "address" to readAddress,
+                "format" to "bytes",
+                "data" to "7f454c46"
+            ),
+
+            // ── search_memory: regex string search ─────────────────────────
+            "search_memory" to mapOf("pattern" to "main", "limit" to 10),
+
+            // ── search_memory: exact byte search ────────────────────────────
+            "search_memory" to mapOf("bytes" to "7f454c46", "limit" to 10),
+
+            // ── disassemble_and_create_function ────────────────────────────
+            // Try to create a function at the entry point. If a function
+            // already exists there, the script reports it gracefully.
+            "disassemble_and_create_function" to mapOf(
+                "address" to commentTargetAddress
+            ),
+
+            // ── set_get_comment: attach and read comments ──────────────────
             "set_get_comment" to mapOf(
                 "address" to commentTargetAddress,
                 "type" to "EOL",
                 "comment" to "AkibaExample1 test marker"
             ),
-            // set_get_comment read mode: verify comment retrieval path.
             "set_get_comment" to mapOf(
                 "action" to "read",
                 "address" to commentTargetAddress,
                 "type" to "ALL"
             ),
-            // rename_function: rename "main" to "renamed_main". The script
-            // opens its own transaction.
-            "rename_function" to mapOf("target" to "main", "newName" to "renamed_main"),
-            // manage_data_type: create a simple structure.
-            "manage_data_type" to mapOf(
-                "name" to "TestStruct",
-                "components" to """[{"name":"field1","type":"int"},{"name":"field2","type":"char"}]"""
-            ),
-            // alter_func_signature: retype param_0 of renamed_main. If the
-            // function has no parameter the script will fail gracefully.
-            "alter_func_signature" to mapOf(
-                "target" to "renamed_main",
-                "action" to "set_param_type",
-                "paramOrdinal" to 0,
-                "paramType" to "int",
-            ),
-            // alter_func_signature: batch mode — retype param_0 and rename
-            // param_1 in a single call. Only runs if the function has both.
-            "alter_func_signature" to mapOf(
-                "target" to "renamed_main",
-                "operations" to """[
-                    {"action":"set_param_type","paramOrdinal":0,"paramType":"char *"},
-                    {"action":"rename_param","paramOrdinal":1,"newParamName":"argc_copy"}
-                ]""",
-            ),
-            // alter_func_var: rename a local variable. If the function has
-            // no matching local, the script will fail gracefully.
-            "alter_func_var" to mapOf(
-                "target" to "renamed_main",
-                "name" to "local_8",
-                "action" to "rename",
-                "newName" to "rc",
-            ),
-            // define_undefine_data: define a dword at a readable address.
+
+            // ── define_undefine_data: define a dword ───────────────────────
             "define_undefine_data" to mapOf("address" to readAddress, "type" to "int", "length" to 4),
-            // alter_label: rename the entry point label. The label at
-            // commentTargetAddress was just used by set_get_comment, so it
-            // should exist.
-            "alter_label" to mapOf(
-                "target" to commentTargetAddress,
-                "action" to "rename",
-                "newName" to "test_marker_label",
-            ),
-            // alter_label: set_data_type on the renamed label.
-            "alter_label" to mapOf(
-                "target" to "test_marker_label",
-                "action" to "set_data_type",
-                "type" to "int",
-                "length" to 4,
-            ),
-            // alter_label: delete the renamed label.
-            "alter_label" to mapOf(
-                "target" to "test_marker_label",
-                "action" to "delete",
-            ),
-            // manage_data_type: query the existing TestStruct.
-            "manage_data_type" to mapOf("name" to "TestStruct", "action" to "get"),
-            // manage_data_type: update TestStruct by renaming a component.
+
+            // ── manage_data_type: create a union ───────────────────────────
             "manage_data_type" to mapOf(
-                "name" to "TestStruct",
-                "action" to "update",
-                "componentEdits" to """[{"index":0,"action":"replace","type":"int","name":"renamed_field"}]""",
+                "action" to "create",
+                "definition" to "union TestUnion { int i; float f; char *s; };"
             ),
-            // manage_data_type: delete TestStruct.
-            "manage_data_type" to mapOf("name" to "TestStruct", "action" to "delete"),
+
+            // ── manage_data_type: delete the struct and union ──────────────
+            "manage_data_type" to mapOf("action" to "delete", "name" to "TestStruct"),
+            "manage_data_type" to mapOf("action" to "delete", "name" to "TestUnion"),
         )
 
         // ── Multi-type parameter tests ──
@@ -203,35 +234,33 @@ class AkibaExample1(
         // This batch exercises every distinct type each script's parameters can take.
         val multiTypeScripts = listOf(
             // ── disassemble_function: 3 modes × diverse types ──
-            // Legacy mode + all Boolean/optional combos.
-            // Note: first batch renamed "main" → "renamed_main", use the new name.
-            "disassemble_function" to mapOf("target" to "renamed_main", "showBytes" to false, "showComments" to false),
-            "disassemble_function" to mapOf("target" to "renamed_main", "force" to true),
-            "disassemble_function" to mapOf("target" to "renamed_main", "addressAfter" to "0x0", "showBytes" to true),
-            // Range mode (String × 2) — force=true needed because readAddress
+            // Note: disassemble_function accepts hex addresses only (no function names).
+            // mainFuncAddress was resolved before renaming, so it stays valid.
+            "disassemble_function" to mapOf("address" to mainFuncAddress, "showBytes" to false, "showComments" to false),
+            "disassemble_function" to mapOf("address" to mainFuncAddress, "force" to true),
+            "disassemble_function" to mapOf("address" to mainFuncAddress, "addressAfter" to "0x0", "showBytes" to true),
+            // Range mode — force=true needed because readAddress
             // is typically outside any function body (e.g. ELF header region).
-            "disassemble_function" to mapOf("startAddress" to readAddress, "endAddress" to readAddress, "force" to true),
-            // Center mode (String + Number × 2 + Boolean)
-            // readAddress may be outside any function; use force=true.
+            "disassemble_function" to mapOf("startAddress" to readAddress, "endAddress" to readEndAddress, "force" to true),
+            // Center mode
             "disassemble_function" to mapOf("address" to readAddress, "before" to 2, "after" to 16.0, "showBytes" to true, "force" to true),
 
-            // ── read_memory_region: String + Number + String(enum) + String(enum) + Number + Number ──
-            // All format variants; endian explicitly set
-            "read_memory_region" to mapOf("address" to readAddress, "size" to 16, "format" to "bytes", "endian" to "little"),
-            "read_memory_region" to mapOf("address" to readAddress, "size" to 8, "format" to "ascii", "columns" to 8),
-            "read_memory_region" to mapOf("address" to readAddress, "size" to 4, "format" to "u32", "endian" to "big", "maxItems" to 1),
-            "read_memory_region" to mapOf("address" to readAddress, "size" to 16, "format" to "hex", "columns" to 32),
+            // ── read_memory: String + Number + String(enum) + String(enum) + Number + Number ──
+            "read_memory" to mapOf("address" to readAddress, "size" to 16, "format" to "bytes", "endian" to "little"),
+            "read_memory" to mapOf("address" to readAddress, "size" to 8, "format" to "ascii", "columns" to 8),
+            "read_memory" to mapOf("address" to readAddress, "size" to 4, "format" to "u32", "endian" to "big", "maxItems" to 1),
+            "read_memory" to mapOf("address" to readAddress, "size" to 16, "format" to "hex", "columns" to 32),
 
             // ── search_strings: String + Boolean × 2 + Number × 2 ──
             "search_strings" to mapOf("query" to "/", "caseSensitive" to true, "exact" to false, "limit" to 100),
             "search_strings" to mapOf("query" to "/", "caseSensitive" to false, "exact" to true, "minLength" to 1, "limit" to 50.0),
             "search_strings" to mapOf("query" to "lib", "limit" to 10, "exact" to true),
-            "search_strings" to mapOf("query" to "", "limit" to 5),                        // empty query (script rejects this gracefully)
+            "search_strings" to mapOf("query" to "", "limit" to 5),
 
             // ── list_strings: Number ──
-            "list_strings" to mapOf("minLength" to 0),                                     // Int 0
-            "list_strings" to mapOf("minLength" to 3.0),                                   // Double → toInt()=3
-            "list_strings" to mapOf("minLength" to null),                                  // null → falls to default
+            "list_strings" to mapOf("minLength" to 0),
+            "list_strings" to mapOf("minLength" to 3.0),
+            "list_strings" to mapOf("minLength" to null),
 
             // ── entry_point_context: Number × 3 + Boolean ──
             "entry_point_context" to mapOf("before" to 0, "after" to 16, "showBytes" to false, "maxEntryPoints" to 4),
@@ -245,38 +274,54 @@ class AkibaExample1(
             "elf_plt_got_info" to mapOf("maxRelocations" to 30, "showDynamicSymbols" to true, "maxSymbols" to 50),
             "elf_plt_got_info" to mapOf("maxRelocations" to 5000, "showDynamicSymbols" to false, "maxSymbols" to 10),
 
-            // ── set_get_comment: String × 3 + Boolean; read mode uses action/type only ──
-            "set_get_comment" to mapOf("address" to commentTargetAddress, "type" to "PRE", "comment" to "multi-type EOL test", "append" to false),
+            // ── set_get_comment: String × 3 + Boolean ──
+            "set_get_comment" to mapOf("address" to commentTargetAddress, "type" to "PRE", "comment" to "multi-type test", "append" to false),
             "set_get_comment" to mapOf("address" to commentTargetAddress, "type" to "PLATE", "comment" to "multi-type append", "append" to true),
             "set_get_comment" to mapOf("action" to "read", "address" to commentTargetAddress, "type" to "ALL"),
 
-            // ── rename_function: String × 2 + additional String optional ──
-            "rename_function" to mapOf("target" to "renamed_main", "newName" to "type_test_main", "returnType" to "void"),
+            // ── manage_func_signature: read + write with diverse types ──
+            "manage_func_signature" to mapOf("address" to "renamed_main", "action" to "read"),
+            "manage_func_signature" to mapOf(
+                "address" to "renamed_main",
+                "signature" to "int renamed_main(int argc, char **argv)",
+                "forceRename" to false
+            ),
+
+            // ── manage_data_type: C definition with diverse types ──
+            "manage_data_type" to mapOf(
+                "action" to "create",
+                "definition" to "struct MultiTypeTest { int field1; char *field2; unsigned long field3; };"
+            ),
+            "manage_data_type" to mapOf("action" to "get", "name" to "MultiTypeTest"),
+            "manage_data_type" to mapOf("action" to "delete", "name" to "MultiTypeTest"),
+
+            // ── write_memory: String + String + diverse formats ──
+            "write_memory" to mapOf("address" to readAddress, "format" to "bytes", "data" to "90909090"),
+            "write_memory" to mapOf("address" to readAddress, "format" to "u32", "data" to "[1,2,3]"),
+            "write_memory" to mapOf("address" to readAddress, "format" to "string", "data" to "test"),
+
+            // ── search_memory: String + Number ──
+            "search_memory" to mapOf("pattern" to "test", "limit" to 5),
+            "search_memory" to mapOf("bytes" to "90909090", "limit" to 5.0, "contextBytes" to 8),
 
             // ── get_xrefs: String + String(enum) ──
-            "get_xrefs" to mapOf("target" to "type_test_main", "direction" to "to"),
-            "get_xrefs" to mapOf("target" to "type_test_main", "direction" to "from"),
-            "get_xrefs" to mapOf("target" to "type_test_main", "direction" to "both"),
+            "get_xrefs" to mapOf("target" to "renamed_main", "direction" to "to"),
+            "get_xrefs" to mapOf("target" to "renamed_main", "direction" to "from"),
+            "get_xrefs" to mapOf("target" to "renamed_main", "direction" to "both"),
 
-            // ── list_functions: String × 2 (both optional, range filtering) ──
+            // ── list_functions: String × 2 ──
             "list_functions" to emptyMap<String, Any>(),
             "list_functions" to mapOf("startAddress" to readAddress),
 
-            // ── Mixed types: Int + Bool + String in single call ──
-            "read_memory_region" to mapOf("address" to readAddress, "size" to 32, "format" to "i32", "endian" to "program"),
-
-            // ── Long value (beyond 32-bit Int range) → still works via Number.toInt() ──
+            // ── Long value (beyond 32-bit Int range) ──
             "search_strings" to mapOf("query" to "/", "limit" to 5000000000L),
 
             // ── String with special characters ──
-            "search_strings" to mapOf("query" to "hello world", "limit" to 10),             // space
-            "search_strings" to mapOf("query" to "/lib/ld-linux", "limit" to 10),            // path separators
+            "search_strings" to mapOf("query" to "hello world", "limit" to 10),
+            "search_strings" to mapOf("query" to "/lib/ld-linux", "limit" to 10),
 
             // ── define_undefine_data: String + String(enum) + String + Number ──
             "define_undefine_data" to mapOf("address" to readAddress, "action" to "define", "type" to "int", "length" to 4),
-
-            // ── alter_label: String × 2 + optional String ──
-            "alter_label" to mapOf("target" to commentTargetAddress, "newName" to "multi_type_label")
         )
 
         var passed = 0
@@ -335,9 +380,6 @@ class AkibaExample1(
         logger.info("=== Script Library Results: $passed passed, $failed failed ===")
 
         // ── Multi-type parameter batch ──
-        // Run the same execution loop against scripts with diverse parameter
-        // types (Boolean false, Int 0, Double, null, List, etc.). Failures
-        // here are counted separately so they don't obscure baseline regressions.
         logger.info("=== Starting Multi-Type Parameter Tests ===")
         var typePassed = 0
         var typeFailed = 0
@@ -363,9 +405,6 @@ class AkibaExample1(
                 val success = node["success"]?.asBoolean() ?: false
                 if (success) {
                     val outputText = node["output"]?.asText() ?: ""
-                    // success=true only means no unhandled exception.
-                    // Scripts that gracefully report errors via appendLine("Error: ...")
-                    // still exit "successfully" — we must inspect the output.
                     if (outputText.startsWith("Error:")) {
                         logger.error("[TYPE-FAIL] $scriptName ${params.keys} — success=true but script output is an error: ${outputText.take(200)}")
                         typeFailed++
