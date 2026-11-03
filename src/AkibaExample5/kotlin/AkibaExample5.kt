@@ -2,35 +2,23 @@ package org.iotsplab.akiba.module
 
 import ghidra.program.model.listing.Program
 import org.apache.logging.log4j.Level
-import org.iotsplab.akiba.llm.agent.AgentModule
-import org.iotsplab.akiba.llm.agent.AgentPrompts
-import org.iotsplab.akiba.llm.tool.Tool
+import org.iotsplab.akiba.llm.agent.module.AgentModule
+import org.iotsplab.akiba.llm.agent.core.AgentPrompts
+import org.iotsplab.akiba.llm.tool.core.Tool
 import org.iotsplab.akiba.utils.WithAgentMaxIterations
-import org.iotsplab.akiba.llm.tool.BuiltInTools
+import org.iotsplab.akiba.llm.tool.core.BuiltInTools
 
 import org.iotsplab.akiba.utils.DoNotCreateTable
 
 /**
- * Example 5 — **Security Vulnerability Analysis Agent**
+ * Example 5 — security vulnerability analysis agent.
  *
- * This module deploys an LLM agent that:
- *  1. Inspects the current program (imported binary).
- *  2. Identifies potential security vulnerabilities (buffer overflows,
- *     format string bugs, use-after-free, integer overflows, insecure
- *     API usage, etc.).
- *  3. Produces a structured summary of findings.
- *
- * All built-in tools are available, including `run_script` for dynamic
- * analysis, `query_ghidra_api` for API lookup, `run_module` for
- * delegating to other analysis modules, etc.
- *
- * LLM provider and API key are resolved from the main configuration
- * file's `"llm"` section (via [ConfigManager.llmConf]).
- *
- * This is intended as a test of the agent pipeline end-to-end.
- * [maxAgentIterations] is set to 20 to give the agent enough room for
- * multi-step analysis. `spawn_sub_agent` is disabled to keep the analysis
- * focused on a single pass.
+ * Deploys an LLM agent that inspects the current program for vulnerabilities
+ * (buffer overflows, format string bugs, use-after-free, integer overflows,
+ * insecure API usage) and writes a structured findings summary. All built-in
+ * tools are available; provider and API key come from the main config's `"llm"`
+ * section ([ConfigManager.llmConf]). `spawn_sub_agent` stays disabled so the
+ * analysis runs as a single focused pass.
  */
 @WithAgentMaxIterations(100)
 @DoNotCreateTable

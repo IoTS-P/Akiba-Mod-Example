@@ -11,34 +11,14 @@ import org.iotsplab.akiba.utils.WithTableColumn
 import org.iotsplab.akiba.utils.string.allStrings
 
 /**
- * `AkibaExample3` exercises the new runtime module-invocation API
- * ([AkibaModule.callModule]) introduced for dynamic, on-demand task scheduling.
+ * `AkibaExample3` exercises the runtime module-invocation API
+ * ([AkibaModule.callModule]): it schedules its own dependencies while running
+ * instead of relying on a pre-arranged `tasks` array.
  *
- * Unlike the older example modules, which rely on a pre-arranged `tasks` array
- * in the global config file to chain analyses together, `AkibaExample3` schedules
- * its dependencies itself, *while it is running*:
- *
- *  1. It calls `AkibaExample1` via [callModule] to make sure the binary's strings
- *     have been collected and `findMainFunction` has been registered as a task
- *     interface in the shared [ModuleContext]. `AkibaExample1` does not declare a
- *     config class, so this call uses no config injection.
- *  2. It then invokes `AkibaExample1.findMainFunction` via [callTaskAPI] to fetch
- *     the address of `main`, identical to how `AkibaExample2` does it — but
- *     crucially, this works without `AkibaExample1` being listed in the task
- *     pipeline beforehand.
- *  3. Finally, it pulls the strings the previous module wrote to
- *     `example_table_1`, filters them by the in-memory config's `prefix` /
- *     `minLength`, and writes the count plus `main`'s address to its own table.
- *
- * The point of the test is therefore to demonstrate that:
- *
- *  - A module can be invoked at runtime without being declared in `tasks`.
- *  - The shared coroutine context (incl. [ModuleContext.data] and registered
- *    task interfaces) propagates correctly across [callModule] boundaries.
- *  - The module's own configuration can be supplied via any of the three
- *    config-injection paths offered by [callModule] (`config`, `configJson`,
- *    `configKey`); for the docker test we exercise the `config` path from
- *    [AkibaExample4].
+ * It calls `AkibaExample1` via [callModule], then its `findMainFunction` task via
+ * [callTaskAPI], then filters the strings in `example_table_1`. This shows a module
+ * runs without being declared in `tasks`, [ModuleContext] state and task interfaces
+ * propagate across [callModule], and any of the three config paths can be used.
  */
 @WithConfigClass(AkibaExample3Config::class)
 @WithTableColumn("matched_count", "INTEGER")

@@ -12,35 +12,14 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 
 /**
- * `AkibaExample4` exercises the runtime *file import* API
- * ([AkibaModule.importFile]) together with the runtime module-invocation API
- * ([AkibaModule.callModule]) and the in-memory **runtime report** that lets a
- * parent module observe a child's runtime side-effects without going through the
- * database.
+ * `AkibaExample4` exercises [AkibaModule.importFile] and [AkibaModule.callModule]
+ * with an in-memory config, plus the runtime report that lets a parent observe a
+ * child's side-effects without a database round-trip.
  *
- * The scenario emulates a realistic use case: a module discovers / extracts a
- * new artifact while analyzing one binary and wants to (a) register that new
- * artifact in the database with provenance information, and (b) run further
- * analyses on the new artifact in the same Akiba run, without having to
- * pre-list it in the import config or the task pipeline.
- *
- *  1. Compose a small *variant* of the binary currently under analysis by
- *     copying [usingFile] to a temporary path and appending a tiny tail to
- *     change its MD5. This simulates the "newly discovered" file.
- *  2. Call [importFile] to register the variant in the database. The new row
- *     in `binaries` is automatically tagged with `source_id = <this.id>` and
- *     `source_module = "AkibaExample4"`, so the provenance can be recovered
- *     later by joining on `binaries.source_id` / `binaries.source_module`.
- *  3. Call [callModule] to run [AkibaExample3] on the freshly-imported file —
- *     supplying its config as an **in-memory object**, which is the new code
- *     path added to the framework. No config file is written or read.
- *  4. Read [AkibaModule.runtimeReportView] on the returned child instance to
- *     pick up:
- *       - the cumulative `updateData` payload the child wrote (so we can grab
- *         the matched-string count without an extra DB query),
- *       - the child's `execution_time_ms` (handy for budget bookkeeping).
- *  5. Persist a small summary to this module's own results table for the
- *     docker test to inspect.
+ * A variant of [usingFile] (same bytes plus a tail, so a new MD5) is imported with
+ * provenance (`source_id` / `source_module` on the new `binaries` row), then
+ * [AkibaExample3] runs on it and its `updateData` / `execution_time_ms` are read
+ * from [AkibaModule.runtimeReportView].
  */
 @WithTableColumn("imported_id", "INTEGER")
 @WithTableColumn("imported_path", "TEXT")
@@ -80,16 +59,12 @@ class AkibaExample4(
             logger.info("Imported variant as binary id=$newId " +
                 "(source_id=${this.id}, source_module=AkibaExample4)")
 
-            // 3. Run AkibaExample3 on the new id with an in-memory config.
-            //    This exercises both `callModule(targetId = ..., config = ...)`
-            //    and the chained import->analyze workflow.
-            //
-            //    Note on the program name: `ImportManager.importSingleFile` saves the
-            //    Ghidra program to the project root using the standard
-            //    `<id>-<filename>` convention (the same pattern used by
-            //    `ProgramManager.workOnBinary`). The first arg of `openProgram` is the
-            //    Ghidra-project folder path (NOT a filesystem path), so we pass "/" to
-            //    address the project root.
+            // 3. Run AkibaExample3 on the new id with an in-memory config, which
+            //    exercises both `callModule(targetId = ..., config = ...)` and the
+            //    import->analyze chain. `openProgram`'s first arg is the
+            //    Ghidra-project folder path (NOT a filesystem path), so "/" targets
+            //    the project root; `importSingleFile` names the saved program
+            //    `<id>-<filename>`, matching `ProgramManager.workOnBinary`.
             val childCfg = AkibaExample3Config(prefix = "", minLength = 1)
             val childProgramName = "$newId-${tmpFile.fileName}"
             val childProgram = project.openProgram("/", childProgramName, false)

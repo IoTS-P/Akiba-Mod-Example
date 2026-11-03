@@ -8,8 +8,8 @@ import ghidra.program.util.GhidraProgramUtilities
 import ghidra.util.task.TaskMonitor
 import org.apache.logging.log4j.Level
 import org.iotsplab.akiba.data.database.AgentDatabaseClient
-import org.iotsplab.akiba.llm.agent.AgentModule
-import org.iotsplab.akiba.llm.tool.ScriptLibraryTool
+import org.iotsplab.akiba.llm.agent.module.AgentModule
+import org.iotsplab.akiba.llm.tool.analysis.ScriptLibraryTool
 import org.iotsplab.akiba.utils.FailOnCancelled
 import org.iotsplab.akiba.utils.IgnoreRuntimeTimeout
 import org.iotsplab.akiba.utils.TaskInterface
